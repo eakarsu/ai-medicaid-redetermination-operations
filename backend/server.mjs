@@ -36,6 +36,36 @@ function identifier(value) {
   return `"${value}"`;
 }
 
+function operationRecordInput(module, body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: 'Record fields are required' };
+  const fields = [
+    { key: 'reference', type: 'text' }, { key: 'status', type: 'select', options: ['Open', 'Investigating', 'Review', 'Approved', 'Closed'] },
+    { key: 'owner', type: 'text' }, { key: 'risk', type: 'select', options: ['Low', 'Moderate', 'High', 'Critical'] },
+    { key: 'due_date', type: 'date' }, { key: 'amount', type: 'number' },
+    ...module.columns.map(column => ({ key: column.dbKey, type: column.type, options: column.options })),
+  ];
+  const values = [];
+  for (const field of fields) {
+    const value = body[field.key];
+    if (value === undefined || value === null || String(value).trim() === '') return { error: `${field.key} is required` };
+    if (field.type === 'number') {
+      const number = Number(value);
+      if (!Number.isFinite(number) || number < 0) return { error: `${field.key} must be a non-negative number` };
+      values.push(number);
+    } else if (field.type === 'date') {
+      const date = String(value);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date) return { error: `${field.key} must be a valid date` };
+      values.push(date);
+    } else {
+      const text = String(value).trim();
+      if (text.length > 4000) return { error: `${field.key} is too long` };
+      if (field.options && !field.options.includes(text)) return { error: `${field.key} has an invalid value` };
+      values.push(text);
+    }
+  }
+  return { columns: fields.map(field => field.key), values };
+}
+
 function aiStatus() {
   const baseUrl = String(process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
   const model = String(process.env.OPENROUTER_MODEL || 'anthropic/claude-haiku-4.5').trim();
@@ -393,6 +423,64 @@ export function createApp() {
     if (!module) return res.status(404).json({ error: 'Unknown operational module' });
     const result = await pool.query(`SELECT * FROM ${identifier(module.table)} ORDER BY due_date`);
     res.json({ module, items: result.rows });
+  });
+  api.post('/operation-records/:moduleId', requirePermission('operations:create'), async (req, res) => {
+    const module = config.operations.find(item => item.id === req.params.moduleId);
+    if (!module) return res.status(404).json({ error: 'Unknown operational module' });
+    const input = operationRecordInput(module, req.body);
+    if (input.error) return res.status(422).json({ error: input.error });
+    const columns = input.columns.map(identifier).join(',');
+    const placeholders = input.values.map((_, index) => `$${index + 1}`).join(',');
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(`INSERT INTO ${identifier(module.table)} (${columns}) VALUES (${placeholders}) RETURNING *`, input.values);
+      await audit(client, req.user.email, 'Created', module.title, result.rows[0].reference, 'Operational register record created');
+      await client.query('COMMIT');
+      res.status(201).json({ item: result.rows[0], message: 'Record created' });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      if (error.code === '23505') return res.status(409).json({ error: 'Reference already exists in this register' });
+      throw error;
+    } finally { client.release(); }
+  });
+  api.put('/operation-records/:moduleId/:id', requirePermission('operations:edit'), async (req, res) => {
+    const module = config.operations.find(item => item.id === req.params.moduleId);
+    const id = Number(req.params.id);
+    if (!module) return res.status(404).json({ error: 'Unknown operational module' });
+    if (!Number.isSafeInteger(id) || id < 1) return res.status(422).json({ error: 'Invalid record ID' });
+    const input = operationRecordInput(module, req.body);
+    if (input.error) return res.status(422).json({ error: input.error });
+    const assignments = input.columns.map((column, index) => `${identifier(column)}=$${index + 1}`).join(',');
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(`UPDATE ${identifier(module.table)} SET ${assignments} WHERE id=$${input.values.length + 1} RETURNING *`, [...input.values, id]);
+      if (!result.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Record not found' }); }
+      await audit(client, req.user.email, 'Edited', module.title, result.rows[0].reference, 'Operational register record edited');
+      await client.query('COMMIT');
+      res.json({ item: result.rows[0], message: 'Record saved' });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      if (error.code === '23505') return res.status(409).json({ error: 'Reference already exists in this register' });
+      throw error;
+    } finally { client.release(); }
+  });
+  api.delete('/operation-records/:moduleId/:id', requirePermission('operations:delete'), async (req, res) => {
+    const module = config.operations.find(item => item.id === req.params.moduleId);
+    const id = Number(req.params.id);
+    if (!module) return res.status(404).json({ error: 'Unknown operational module' });
+    if (!Number.isSafeInteger(id) || id < 1) return res.status(422).json({ error: 'Invalid record ID' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(`DELETE FROM ${identifier(module.table)} WHERE id=$1 RETURNING reference`, [id]);
+      if (!result.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Record not found' }); }
+      await audit(client, req.user.email, 'Deleted', module.title, result.rows[0].reference, 'Operational register record deleted');
+      await client.query('COMMIT');
+      res.json({ message: 'Record deleted' });
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
   });
   api.get('/reports', async (_req, res) => {
     const modules = [];

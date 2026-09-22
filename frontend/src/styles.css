@@ -42,3 +42,20 @@
   .sideFoot{position:static;margin-top:8px}
   .sideFoot .wide{width:auto;margin:0}
 }
+
+/* Register record dialogs and actions. */
+.registerToolbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:0 0 16px}
+.registerToolbar .badge{margin-right:auto}
+.modalBackdrop{align-items:center;justify-content:center}
+.modal{display:flex;flex-direction:column;max-height:min(90vh,900px)}
+.modal header{flex:none}
+.modalBody{min-height:0;overflow:auto}
+.recordForm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}
+.recordForm label{margin:8px 0}
+.recordForm textarea{min-height:90px}
+.modalHeaderActions{display:flex;flex:none;justify-content:flex-end;flex-wrap:wrap;gap:8px}
+.modalHeaderActions button{white-space:nowrap}
+.modal header h3{min-width:0;overflow-wrap:anywhere}
+.danger{border:0;border-radius:10px;padding:11px 14px;background:#b91c1c;color:#fff;font-weight:800;cursor:pointer}
+.danger:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:600px){.recordForm{grid-template-columns:1fr}.modalBackdrop{padding:12px}.modal header{align-items:flex-start;flex-direction:column}.modalHeaderActions{width:100%;justify-content:flex-start}.modalHeaderActions button{flex:1}}

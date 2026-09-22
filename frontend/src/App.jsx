@@ -22,10 +22,80 @@ function Login({ health, onLogin }) {
   return <div className="login"><section className="loginHero"><span className="eyebrow">React · PostgreSQL · OpenRouter</span><h1>{health?.title || 'Loading…'}</h1><p>{health?.tagline || 'Specialized operations intelligence'}</p></section><section className="loginPanel"><form className="loginCard" onSubmit={submit}><h2>Sign in</h2><p className="muted">Access the provisioned PostgreSQL demonstration workspace.</p><div className="demo"><strong>Demo access</strong><span className="muted">One click fills a provisioned local account. Roles demonstrate the RBAC matrix.</span><div className="roleFill">{accounts.map(account => <button type="button" key={account.role} onClick={() => fill(account)}><strong>{account.name}</strong><small>{account.role} · {account.email}</small></button>)}</div></div><label>Email</label><input className="input" type="email" value={email} onChange={event => setEmail(event.target.value)} required/><label>Password</label><input className="input" type="password" value={password} onChange={event => setPassword(event.target.value)} required/><button className="primary wide">Sign in securely</button>{error && <div className="error">{error}</div>}</form></section></div>;
 }
 
-function Modal({ title, children, onClose }) { return <div className="modalBackdrop" onMouseDown={event => event.target === event.currentTarget && onClose()}><div className="modal"><header><h3>{title}</h3><button className="ghost" onClick={onClose}>Close</button></header><div className="modalBody">{children}</div></div></div>; }
+function Modal({ title, children, onClose, actions }) { return <div className="modalBackdrop" onMouseDown={event => event.target === event.currentTarget && onClose()}><div className="modal" role="dialog" aria-modal="true" aria-label={title}><header><h3>{title}</h3><div className="modalHeaderActions">{actions || <button className="ghost" onClick={onClose}>Cancel</button>}</div></header><div className="modalBody">{children}</div></div></div>; }
 function DetailGrid({ item }) { return <div className="detailGrid">{Object.entries(item).filter(([, value]) => value !== null && value !== undefined).map(([key, value]) => <div className="detail" key={key}><small>{pretty(key)}</small><strong>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</strong></div>)}</div>; }
 function PageTitle({ title, subtitle }) { return <div className="pageTitle"><h2>{title}</h2><p>{subtitle}</p></div>; }
 function Metric({ label, value }) { return <div className="metric"><span>{label}</span><strong>{value}</strong></div>; }
+
+const recordFields = module => [
+  { key: 'reference', label: 'Reference', type: 'text' },
+  { key: 'status', label: 'Status', type: 'select', options: ['Open', 'Investigating', 'Review', 'Approved', 'Closed'] },
+  { key: 'owner', label: 'Owner', type: 'text' },
+  { key: 'risk', label: 'Risk', type: 'select', options: ['Low', 'Moderate', 'High', 'Critical'] },
+  { key: 'due_date', label: 'Due date', type: 'date' },
+  { key: 'amount', label: 'Amount', type: 'number' },
+  ...module.columns.map(column => ({ ...column, key: column.dbKey })),
+];
+function recordForm(module, item, user) {
+  return Object.fromEntries(recordFields(module).map(field => [field.key,
+    item ? (field.type === 'date' ? String(item[field.key] || '').slice(0, 10) : String(item[field.key] ?? ''))
+      : field.key === 'owner' ? user.name : field.key === 'status' ? 'Open' : field.key === 'risk' ? 'Moderate'
+        : field.type === 'date' ? new Date().toISOString().slice(0, 10) : field.type === 'number' ? '0'
+          : field.type === 'select' ? field.options[0] : '',
+  ]));
+}
+
+function RegisterModal({ module, item, feature, user, onClose, onChanged, notify }) {
+  const [mode, setMode] = useState(item ? 'view' : 'new');
+  const [form, setForm] = useState(() => recordForm(module, item, user));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const canEdit = ['admin', 'operator'].includes(user.role);
+  const canDelete = user.role === 'admin';
+  function changeMode(next) { setError(''); setForm(recordForm(module, next === 'new' ? null : item, user)); setMode(next); }
+  async function save(event) {
+    event.preventDefault(); setBusy(true); setError('');
+    try {
+      const isNew = mode === 'new';
+      const result = await api(isNew ? `/api/operation-records/${module.id}` : `/api/operation-records/${module.id}/${item.id}`, {
+        method: isNew ? 'POST' : 'PUT', body: JSON.stringify(form),
+      });
+      notify(result.message); await onChanged(); onClose();
+    } catch (failure) { setError(failure.message); } finally { setBusy(false); }
+  }
+  async function remove() {
+    setBusy(true); setError('');
+    try {
+      const result = await api(`/api/operation-records/${module.id}/${item.id}`, { method: 'DELETE' });
+      notify(result.message); await onChanged(); onClose();
+    } catch (failure) { setError(failure.message); } finally { setBusy(false); }
+  }
+  async function runAction(action) {
+    setBusy(true); setError('');
+    try {
+      const result = await api(`/api/domain/${feature.id}/actions/${action.id}`, { method: 'POST', body: JSON.stringify({ moduleId: module.id, recordId: item.id }) });
+      notify(`${result.message}. ${result.auditDetail}`); await onChanged(); onClose();
+    } catch (failure) { setError(failure.message); } finally { setBusy(false); }
+  }
+  const title = mode === 'new' ? `New ${module.title}` : `${module.title} · ${item.reference}`;
+  const headerActions = mode === 'view' ? <>
+    {canEdit && <><button className="secondary" onClick={() => changeMode('new')}>New</button><button className="secondary" onClick={() => changeMode('edit')}>Edit</button></>}
+    {canDelete && <button className="danger" onClick={() => changeMode('delete')}>Delete</button>}
+    <button className="ghost" onClick={onClose}>Cancel</button>
+  </> : mode === 'delete' ? <>
+    <button className="danger" disabled={busy} onClick={remove}>{busy ? 'Deleting…' : 'Delete record'}</button>
+    <button className="ghost" onClick={() => changeMode('view')}>Cancel</button>
+  </> : <>
+    <button className="primary" disabled={busy} type="submit" form="registerRecordForm">{busy ? 'Saving…' : 'Save'}</button>
+    <button className="ghost" onClick={() => item ? changeMode('view') : onClose()}>Cancel</button>
+  </>;
+  return <Modal title={title} onClose={onClose} actions={headerActions}>
+    {mode === 'view' && <><p className="muted">{module.description}</p><DetailGrid item={item}/>{feature && canEdit && <><h4>Workflow actions</h4><div className="buttonRow">{feature.actions.map(action => <button className="primary" disabled={busy} key={action.id} onClick={() => runAction(action)}>{action.label}</button>)}</div></>}</>}
+    {(mode === 'new' || mode === 'edit') && <form id="registerRecordForm" onSubmit={save}><div className="recordForm">{recordFields(module).map(field => <label key={field.key}><span>{field.label}</span>{field.type === 'textarea' ? <textarea className="input" required value={form[field.key]} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))}/> : field.type === 'select' ? <select className="input" required value={form[field.key]} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))}>{field.options.map(option => <option key={option} value={option}>{option}</option>)}</select> : <input className="input" required type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'} min={field.type === 'number' ? 0 : undefined} step={field.type === 'number' ? 'any' : undefined} value={form[field.key]} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))}/>}</label>)}</div></form>}
+    {mode === 'delete' && <p>Delete <strong>{item.reference}</strong> from {module.title}? This removes the record from the register and writes an audit event.</p>}
+    {error && <div className="error" role="alert">{error}</div>}
+  </Modal>;
+}
 
 function RichText({ text, compact = false }) {
   const lines = String(text || '').split(/\n+/).map(line => line.trim()).filter(Boolean);
@@ -82,16 +152,9 @@ function DomainHome({ app, openModule }) {
 }
 
 function DomainCapability({ app, featureId, moduleId, notify }) {
-  const [data, setData] = useState(null); const [selected, setSelected] = useState(null); const [busy, setBusy] = useState(false);
+  const [data, setData] = useState(null); const [selected, setSelected] = useState(null);
   async function load() { setData(await api(`/api/domain/${featureId}`)); }
   useEffect(() => { setData(null); setSelected(null); load(); }, [featureId, moduleId]);
-  async function runAction(action) {
-    setBusy(true);
-    try {
-      const result = await api(`/api/domain/${featureId}/actions/${action.id}`, { method: 'POST', body: JSON.stringify({ moduleId: selected.module.id, recordId: selected.item.id }) });
-      notify(`${result.message}. ${result.auditDetail}`); setSelected(null); await load();
-    } catch (failure) { notify(failure.message); } finally { setBusy(false); }
-  }
   if (!data) return <p>Loading domain capability…</p>;
   const { feature } = data;
   const groups = data.groups.filter(group => group.module.id === moduleId);
@@ -102,7 +165,7 @@ function DomainCapability({ app, featureId, moduleId, notify }) {
   const total = allRows.reduce((sum, { item }) => sum + Number(item.amount || 0), 0);
   const renderTable = group => <section className="domainSection" key={group.module.id}><div className="moduleTitle"><div><h3>{group.module.title}</h3><p>{group.module.description}</p></div><span className="badge">{group.items.length} records</span></div><div className="tableWrap"><table><thead><tr><th>Reference</th><th>Status</th><th>Risk</th><th>Owner</th><th>Due</th><th>Value</th>{group.module.columns.slice(0, 4).map(column => <th key={column.dbKey}>{column.label}</th>)}</tr></thead><tbody>{group.items.map(item => <tr className="clickable" key={item.id} onClick={() => setSelected({ module: group.module, item })}><td>{item.reference}</td><td><span className={`status status-${String(item.status).toLowerCase()}`}>{item.status}</span></td><td>{item.risk}</td><td>{item.owner}</td><td>{String(item.due_date).slice(0,10)}</td><td>{money(item.amount)}</td>{group.module.columns.slice(0,4).map(column => <td key={column.dbKey}>{String(item[column.dbKey])}</td>)}</tr>)}</tbody></table></div></section>;
   const board = <div className="kanban">{['Open','Investigating','Review','Approved','Closed'].map(status => <section key={status}><h4>{status}<span>{allRows.filter(({ item }) => item.status === status).length}</span></h4>{allRows.filter(({ item }) => item.status === status).slice(0,8).map(({ item, module }) => <button key={`${module.id}-${item.id}`} onClick={() => setSelected({ item, module })}><strong>{item.reference}</strong><span>{module.title}</span><small>{item.owner} · {item.risk}</small></button>)}</section>)}</div>;
-  return <><PageTitle title={module.title} subtitle={module.description}/><div className="capabilityStrip"><Metric label="Controlled records" value={allRows.length}/><Metric label="Require action" value={attention}/><Metric label="Value represented" value={money(total)}/><div className="processNote"><strong>{feature.view === 'reconciliation' ? 'Reconciliation control' : feature.view === 'evidence' ? 'Evidence decision' : feature.view === 'deadline' ? 'Deadline governance' : feature.view === 'control' ? 'Preventive control' : 'Managed workflow'}</strong><span>Every action changes PostgreSQL state and writes an attributed audit event.</span></div></div>{feature.view === 'board' ? board : groups.map(renderTable)}{selected && <Modal title={`${module.title} · ${selected.item.reference}`} onClose={() => setSelected(null)}><div className="decisionBanner"><strong>Domain decision required</strong><span>{module.description}</span></div><DetailGrid item={selected.item}/><h4>Permitted actions</h4><div className="buttonRow">{feature.actions.map(action => <button className="primary" disabled={busy} key={action.id} onClick={() => runAction(action)}>{action.label}</button>)}</div><small className="muted">Actions are role-attributed, persisted, and added to the audit trail.</small></Modal>}</>;
+  return <><PageTitle title={module.title} subtitle={module.description}/>{['admin', 'operator'].includes(app.user.role) && <div className="registerToolbar"><button className="primary" onClick={() => setSelected({ module, item: null })}>New record</button></div>}<div className="capabilityStrip"><Metric label="Controlled records" value={allRows.length}/><Metric label="Require action" value={attention}/><Metric label="Value represented" value={money(total)}/><div className="processNote"><strong>{feature.view === 'reconciliation' ? 'Reconciliation control' : feature.view === 'evidence' ? 'Evidence decision' : feature.view === 'deadline' ? 'Deadline governance' : feature.view === 'control' ? 'Preventive control' : 'Managed workflow'}</strong><span>Every action changes PostgreSQL state and writes an attributed audit event.</span></div></div>{feature.view === 'board' ? board : groups.map(renderTable)}{selected && <RegisterModal module={selected.module} item={selected.item} feature={feature} user={app.user} onClose={() => setSelected(null)} onChanged={load} notify={notify}/>}</>;
 }
 
 function AIStudio({ app, initialId, notify }) {
@@ -120,7 +183,15 @@ function AIStudio({ app, initialId, notify }) {
 
 function Queue({ onOpen }) { const [items, setItems] = useState([]); useEffect(() => { api('/api/records').then(data => setItems(data.items)); }, []); return <><PageTitle title="Workflow queue" subtitle="Click any row for complete evidence and state-transition controls."/><div className="tableWrap"><table><thead><tr><th>Reference</th><th>Subject</th><th>Owner</th><th>State</th><th>Risk</th><th>Due</th><th>Amount</th></tr></thead><tbody>{items.map(item => <tr className="clickable" key={item.id} onClick={() => onOpen(item)}><td>{item.reference}</td><td>{item.subject}</td><td>{item.owner}</td><td>{item.state}</td><td>{item.risk}</td><td>{String(item.due_date).slice(0,10)}</td><td>{money(item.amount)}</td></tr>)}</tbody></table></div></>; }
 
-function Operations({ app, moduleId, onOpen }) { const [items, setItems] = useState([]); const module = app.operations.find(item => item.id === moduleId); useEffect(() => { setItems([]); api(`/api/operation-records?module=${encodeURIComponent(moduleId)}`).then(data => setItems(data.items)); }, [moduleId]); if (!module) return <p>Register unavailable.</p>; return <><PageTitle title={module.title} subtitle={module.description}/><div className="moduleTitle"><span className="badge">{items.length} records</span></div><div className="tableWrap"><table><thead><tr><th>Reference</th><th>Status</th><th>Owner</th><th>Risk</th><th>Due</th><th>Amount</th>{module.columns.map(column => <th key={column.dbKey}>{column.label}</th>)}</tr></thead><tbody>{items.map(item => <tr className="clickable" key={item.id} onClick={() => onOpen(module, item)}><td>{item.reference}</td><td>{item.status}</td><td>{item.owner}</td><td>{item.risk}</td><td>{String(item.due_date).slice(0,10)}</td><td>{money(item.amount)}</td>{module.columns.map(column => <td key={column.dbKey}>{String(item[column.dbKey])}</td>)}</tr>)}</tbody></table></div></>; }
+function Operations({ app, moduleId, notify }) {
+  const [items, setItems] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const module = app.operations.find(entry => entry.id === moduleId);
+  async function load() { setItems((await api(`/api/operation-records?module=${encodeURIComponent(moduleId)}`)).items); }
+  useEffect(() => { setItems([]); setSelected(null); load(); }, [moduleId]);
+  if (!module) return <p>Register unavailable.</p>;
+  return <><PageTitle title={module.title} subtitle={module.description}/><div className="registerToolbar"><span className="badge">{items.length} records</span>{['admin', 'operator'].includes(app.user.role) && <button className="primary" onClick={() => setSelected({ module, item: null })}>New record</button>}</div><div className="tableWrap"><table><thead><tr><th>Reference</th><th>Status</th><th>Owner</th><th>Risk</th><th>Due</th><th>Amount</th>{module.columns.map(column => <th key={column.dbKey}>{column.label}</th>)}</tr></thead><tbody>{items.map(item => <tr className="clickable" key={item.id} onClick={() => setSelected({ module, item })}><td>{item.reference}</td><td>{item.status}</td><td>{item.owner}</td><td>{item.risk}</td><td>{String(item.due_date).slice(0,10)}</td><td>{money(item.amount)}</td>{module.columns.map(column => <td key={column.dbKey}>{String(item[column.dbKey])}</td>)}</tr>)}</tbody></table></div>{selected && <RegisterModal module={selected.module} item={selected.item} user={app.user} onClose={() => setSelected(null)} onChanged={load} notify={notify}/>}</>;
+}
 
 function Reports({ openModule }) { const [report, setReport] = useState(null); useEffect(() => { api('/api/reports').then(setReport); }, []); if (!report) return <p>Loading reports…</p>; const max = Math.max(...report.modules.map(item => item.amount)); return <><PageTitle title="Reports and analytics" subtitle="Click any report line to open its PostgreSQL source table."/><div className="metrics"><Metric label="Represented value" value={money(report.totalAmount)}/><Metric label="Attention records" value={report.totalAttention}/><Metric label="Domain modules" value={report.modules.length}/></div><section className="panel reportPanel">{report.modules.map(item => <button className="barRow" key={item.id} onClick={() => openModule(item.id)}><strong>{item.title}</strong><span className="barTrack"><i style={{ width: `${Math.max(4, item.amount / max * 100)}%` }}/></span><span>{money(item.amount)}</span></button>)}</section><div className="tableWrap"><table><thead><tr><th>Module</th><th>Rows</th><th>High/Critical</th><th>Value</th></tr></thead><tbody>{report.modules.map(item => <tr className="clickable" key={item.id} onClick={() => openModule(item.id)}><td>{item.title}</td><td>{item.count}</td><td>{item.attention}</td><td>{money(item.amount)}</td></tr>)}</tbody></table></div></>; }
 
@@ -295,7 +366,6 @@ export default function App() {
   useEffect(() => { api('/api/health').then(setHealth); if (localStorage.getItem('portfolio_token')) loadApp(); }, []);
   function notify(message) { setNotice(message); setTimeout(() => setNotice(''), 4500); }
   async function transitionCase(item, state) { const result = await api('/api/records/transition', { method: 'POST', body: JSON.stringify({ id: item.id, state }) }); setModal(null); notify(result.message); }
-  async function transitionOperation(module, item, state) { const result = await api('/api/operation-records/transition', { method: 'POST', body: JSON.stringify({ moduleId: module.id, id: item.id, state }) }); setModal(null); notify(result.message); }
   if (!app) return <Login health={health} onLogin={loadApp}/>;
   const navigation = [
     { id: 'domain-home', label: 'Overview' },
@@ -308,5 +378,5 @@ export default function App() {
     { id: 'integrations', label: 'Integrations' }, { id: 'claims', label: 'Claims Studio' }, { id: 'architecture', label: 'Architecture' },
   ];
   const currentLabel = navigation.find(item => item.id === page)?.label || app.domainProduct.home;
-  return <div className="shell"><aside className="sidebar"><div className="brand"><span className="eyebrow">{app.industry}</span><h1>{app.title}</h1></div><nav aria-label="Main navigation">{navigation.map(item => item.heading ? <div className="navHeading" key={item.id}>{item.label}</div> : <button className={page === item.id ? 'active' : ''} key={item.id} title={item.title || item.label} onClick={() => setPage(item.id)}><span>{item.label}</span></button>)}</nav><div className="sideFoot"><button className="secondary wide" onClick={() => { localStorage.removeItem('portfolio_token'); setApp(null); }}>Sign out</button></div></aside><main><header className="topbar"><strong>{currentLabel}</strong><span className={`provider ${app.ai.configured ? 'ready' : 'missing'}`}>{app.ai.configured ? `OpenRouter · ${app.ai.model}` : 'OpenRouter configuration required'}</span></header><div className="content">{notice && <div className="success">{notice}</div>}{page === 'domain-home' && <DomainHome app={app} openModule={id => setPage(`register:${id}`)}/>} {page.startsWith('register:') && (app.domainProduct.features.find(feature => feature.modules.includes(page.slice(9))) ? <DomainCapability key={page} app={app} featureId={app.domainProduct.features.find(feature => feature.modules.includes(page.slice(9))).id} moduleId={page.slice(9)} notify={notify}/> : <Operations key={page} app={app} moduleId={page.slice(9)} onOpen={(module, item) => setModal({ type: 'operation', module, item })}/>)} {page === 'ai' && <AIStudio app={app} initialId={aiId} notify={notify}/>} {page === 'reports' && <Reports openModule={id => setPage(`register:${id}`)}/> } {page === 'audit' && <Audit onOpen={item => setModal({ type: 'audit', item })}/>} {page === 'integrations' && <Integrations notify={notify}/>}{page === 'claims' && <ClaimsStudio notify={notify}/>}{page === 'architecture' && <Architecture notify={notify}/>}</div></main>{modal?.type === 'case' && <Modal title={modal.item.subject} onClose={() => setModal(null)}><DetailGrid item={{ ...modal.item, ...modal.item.payload }}/><h4>Advance workflow</h4><div className="buttonRow">{['analyzing','review','approved','closed'].map(state => <button className="secondary" key={state} onClick={() => transitionCase(modal.item, state)}>{state}</button>)}</div></Modal>}{modal?.type === 'operation' && <Modal title={`${modal.module.title} · ${modal.item.reference}`} onClose={() => setModal(null)}><p>{modal.module.description}</p><DetailGrid item={modal.item}/><h4>Advance operational state</h4><div className="buttonRow">{['Open','Investigating','Review','Approved','Closed'].map(state => <button className="secondary" key={state} onClick={() => transitionOperation(modal.module, modal.item, state)}>{state}</button>)}</div></Modal>}{modal?.type === 'audit' && <Modal title={`Audit event · ${modal.item.object_reference}`} onClose={() => setModal(null)}><DetailGrid item={modal.item}/></Modal>}</div>;
+  return <div className="shell"><aside className="sidebar"><div className="brand"><span className="eyebrow">{app.industry}</span><h1>{app.title}</h1></div><nav aria-label="Main navigation">{navigation.map(item => item.heading ? <div className="navHeading" key={item.id}>{item.label}</div> : <button className={page === item.id ? 'active' : ''} key={item.id} title={item.title || item.label} onClick={() => setPage(item.id)}><span>{item.label}</span></button>)}</nav><div className="sideFoot"><button className="secondary wide" onClick={() => { localStorage.removeItem('portfolio_token'); setApp(null); }}>Sign out</button></div></aside><main><header className="topbar"><strong>{currentLabel}</strong><span className={`provider ${app.ai.configured ? 'ready' : 'missing'}`}>{app.ai.configured ? `OpenRouter · ${app.ai.model}` : 'OpenRouter configuration required'}</span></header><div className="content">{notice && <div className="success">{notice}</div>}{page === 'domain-home' && <DomainHome app={app} openModule={id => setPage(`register:${id}`)}/>} {page.startsWith('register:') && (app.domainProduct.features.find(feature => feature.modules.includes(page.slice(9))) ? <DomainCapability key={page} app={app} featureId={app.domainProduct.features.find(feature => feature.modules.includes(page.slice(9))).id} moduleId={page.slice(9)} notify={notify}/> : <Operations key={page} app={app} moduleId={page.slice(9)} notify={notify}/>)} {page === 'ai' && <AIStudio app={app} initialId={aiId} notify={notify}/>} {page === 'reports' && <Reports openModule={id => setPage(`register:${id}`)}/> } {page === 'audit' && <Audit onOpen={item => setModal({ type: 'audit', item })}/>} {page === 'integrations' && <Integrations notify={notify}/>}{page === 'claims' && <ClaimsStudio notify={notify}/>}{page === 'architecture' && <Architecture notify={notify}/>}</div></main>{modal?.type === 'case' && <Modal title={modal.item.subject} onClose={() => setModal(null)}><DetailGrid item={{ ...modal.item, ...modal.item.payload }}/><h4>Advance workflow</h4><div className="buttonRow">{['analyzing','review','approved','closed'].map(state => <button className="secondary" key={state} onClick={() => transitionCase(modal.item, state)}>{state}</button>)}</div></Modal>}{modal?.type === 'audit' && <Modal title={`Audit event · ${modal.item.object_reference}`} onClose={() => setModal(null)}><DetailGrid item={modal.item}/></Modal>}</div>;
 }

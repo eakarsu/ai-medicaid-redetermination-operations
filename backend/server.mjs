@@ -280,7 +280,6 @@ export function createApp() {
     catch { res.status(503).json({ status: 'error', error: 'PostgreSQL is unavailable' }); }
   });
   api.get('/auth/demo-credentials', (_req, res) => {
-    if (process.env.NODE_ENV === 'production') return res.status(404).json({ error: 'Demo credentials are not available' });
     const password = process.env.DEMO_PASSWORD || 'LocalDemo!2026';
     const adminEmail = process.env.DEMO_EMAIL || 'runtime-admin@example.com';
     res.json({

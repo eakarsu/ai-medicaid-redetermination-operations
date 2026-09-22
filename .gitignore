@@ -6,3 +6,5 @@ frontend/dist
 .DS_Store
 backups/
 .local-sftp/
+secrets/
+.env.production

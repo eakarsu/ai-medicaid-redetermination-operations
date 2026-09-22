@@ -5,3 +5,5 @@
 .env.*
 *.md
 scripts/smoke_test.mjs
+.local-sftp
+secrets

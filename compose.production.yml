@@ -1,0 +1,58 @@
+name: renewalcare-medicaid
+
+services:
+  database:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: renewalcare
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: profit_ai_medicaid_redetermination_operations
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U renewalcare -d profit_ai_medicaid_redetermination_operations"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  sftp:
+    image: atmoz/sftp:alpine
+    restart: unless-stopped
+    command: renewalcare::1001:1001:outbound,inbound
+    volumes:
+      - ./secrets/sftp/host_key:/etc/ssh/ssh_host_ed25519_key:ro
+      - ./secrets/sftp/client_key.pub:/home/renewalcare/.ssh/keys/client_key.pub:ro
+      - sftpoutbound:/home/renewalcare/outbound
+      - sftpinbound:/home/renewalcare/inbound
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+      sftp:
+        condition: service_started
+    env_file: .env.production
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: "5542"
+      DATABASE_URL: postgresql://renewalcare:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@database:5432/profit_ai_medicaid_redetermination_operations
+      SFTP_HOST: sftp
+      SFTP_PORT: "22"
+      SFTP_USER: renewalcare
+      SFTP_PRIVATE_KEY_FILE: /run/sftp-keys/client_key
+      SFTP_HOST_KEY_FILE: /run/sftp-keys/host_key.pub
+      SFTP_OUTBOUND_PATH: /outbound
+      SFTP_INBOUND_PATH: /inbound
+    volumes:
+      - ./secrets/sftp/client_key:/run/sftp-keys/client_key:ro
+      - ./secrets/sftp/host_key.pub:/run/sftp-keys/host_key.pub:ro
+    ports:
+      - "127.0.0.1:5542:5542"
+
+volumes:
+  pgdata:
+  sftpoutbound:
+  sftpinbound:

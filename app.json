@@ -751,6 +751,192 @@
           "label": "Recommend Action Plan"
         }
       ]
+    },
+    {
+      "id": "claims-review",
+      "title": "Claim Adjudication Review",
+      "description": "Evaluate claim adjudication review with source evidence, accountable ownership, financial or operational impact, and documented approval.",
+      "fields": [
+        {
+          "key": "caseReference",
+          "label": "Claim Adjudication Review Reference",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "entity",
+          "label": "Beneficiary or Provider Entity",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "reviewDate",
+          "label": "Review Date",
+          "type": "date",
+          "required": true
+        },
+        {
+          "key": "metric",
+          "label": "Claims Reviewed",
+          "type": "number",
+          "required": true
+        },
+        {
+          "key": "evidenceNotes",
+          "label": "Evidence and Reviewer Notes",
+          "type": "textarea",
+          "required": false
+        }
+      ],
+      "states": [
+        "intake",
+        "analyzing",
+        "review",
+        "approved",
+        "closed"
+      ],
+      "examples": [
+        {
+          "id": "std",
+          "label": "Fill Standard Case",
+          "values": {
+            "caseReference": "Claim Adjudication Review Reference STD-2026-104",
+            "entity": "Beneficiary or Provider Entity STD-2026-104",
+            "reviewDate": "2026-09-08",
+            "metric": 125,
+            "evidenceNotes": "Complete: source evidence, financial impact, control context, and documented reviewer rationale are available for analysis."
+          }
+        },
+        {
+          "id": "risk",
+          "label": "Fill High-Risk Case",
+          "values": {
+            "caseReference": "Claim Adjudication Review Reference RISK-2026-104",
+            "entity": "Beneficiary or Provider Entity RISK-2026-104",
+            "reviewDate": "2026-09-08",
+            "metric": 975,
+            "evidenceNotes": "Critical exception: source evidence, financial impact, control context, and documented reviewer rationale are available for analysis."
+          }
+        },
+        {
+          "id": "exc",
+          "label": "Fill Exception Case",
+          "values": {
+            "caseReference": "Claim Adjudication Review Reference EXC-2026-104",
+            "entity": "Beneficiary or Provider Entity EXC-2026-104",
+            "reviewDate": "2026-09-08",
+            "metric": 41,
+            "evidenceNotes": "Reviewer follow-up: source evidence, financial impact, control context, and documented reviewer rationale are available for analysis."
+          }
+        }
+      ],
+      "aiActions": [
+        {
+          "id": "assess",
+          "label": "Assess Risk & Value"
+        },
+        {
+          "id": "evidence",
+          "label": "Build Evidence Checklist"
+        },
+        {
+          "id": "plan",
+          "label": "Recommend Action Plan"
+        }
+      ]
+    },
+    {
+      "id": "fwa-screen",
+      "title": "Program Integrity FWA Screening",
+      "description": "Evaluate program integrity fwa screening with source evidence, accountable ownership, financial or operational impact, and documented approval.",
+      "fields": [
+        {
+          "key": "caseReference",
+          "label": "Program Integrity FWA Screening Reference",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "entity",
+          "label": "Beneficiary or Provider Entity",
+          "type": "text",
+          "required": true
+        },
+        {
+          "key": "reviewDate",
+          "label": "Review Date",
+          "type": "date",
+          "required": true
+        },
+        {
+          "key": "metric",
+          "label": "Alerts Screened",
+          "type": "number",
+          "required": true
+        },
+        {
+          "key": "evidenceNotes",
+          "label": "Evidence and Reviewer Notes",
+          "type": "textarea",
+          "required": false
+        }
+      ],
+      "states": [
+        "intake",
+        "analyzing",
+        "review",
+        "approved",
+        "closed"
+      ],
+      "examples": [
+        {
+          "id": "std",
+          "label": "Fill Standard Case",
+          "values": {
+            "caseReference": "Program Integrity FWA Screening Reference STD-2026-104",
+            "entity": "Beneficiary or Provider Entity STD-2026-104",
+            "reviewDate": "2026-09-08",
+            "metric": 12,
+            "evidenceNotes": "Complete: source evidence, financial impact, control context, and documented reviewer rationale are available for analysis."
+          }
+        },
+        {
+          "id": "risk",
+          "label": "Fill High-Risk Case",
+          "values": {
+            "caseReference": "Program Integrity FWA Screening Reference RISK-2026-104",
+            "entity": "Beneficiary or Provider Entity RISK-2026-104",
+            "reviewDate": "2026-09-08",
+            "metric": 87,
+            "evidenceNotes": "Critical exception: source evidence, financial impact, control context, and documented reviewer rationale are available for analysis."
+          }
+        },
+        {
+          "id": "exc",
+          "label": "Fill Exception Case",
+          "values": {
+            "caseReference": "Program Integrity FWA Screening Reference EXC-2026-104",
+            "entity": "Beneficiary or Provider Entity EXC-2026-104",
+            "reviewDate": "2026-09-08",
+            "metric": 6,
+            "evidenceNotes": "Reviewer follow-up: source evidence, financial impact, control context, and documented reviewer rationale are available for analysis."
+          }
+        }
+      ],
+      "aiActions": [
+        {
+          "id": "assess",
+          "label": "Assess Risk & Value"
+        },
+        {
+          "id": "evidence",
+          "label": "Build Evidence Checklist"
+        },
+        {
+          "id": "plan",
+          "label": "Recommend Action Plan"
+        }
+      ]
     }
   ],
   "operations": [
@@ -1265,6 +1451,392 @@
           "dbKey": "data_effectiveDate"
         }
       ]
+    },
+    {
+      "id": "provider",
+      "title": "Provider Enrollment & Credentialing Register",
+      "description": "Enrollment applications, credentialing status, and screening evidence for Medicaid providers.",
+      "table": "op_provider",
+      "columns": [
+        {
+          "key": "npi",
+          "label": "Provider NPI",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_npi"
+        },
+        {
+          "key": "specialty",
+          "label": "Specialty",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_specialty"
+        },
+        {
+          "key": "screeningDate",
+          "label": "Screening Date",
+          "type": "date",
+          "required": true,
+          "dbKey": "data_screeningDate"
+        },
+        {
+          "key": "sitesEnrolled",
+          "label": "Sites Enrolled",
+          "type": "number",
+          "required": true,
+          "dbKey": "data_sitesEnrolled"
+        },
+        {
+          "key": "credentialNotes",
+          "label": "Credentialing Notes",
+          "type": "textarea",
+          "required": false,
+          "dbKey": "data_credentialNotes"
+        }
+      ]
+    },
+    {
+      "id": "claims",
+      "title": "Claim Adjudication Register",
+      "description": "Professional claim intake, adjudication decisions, and remittance readiness for Medicaid claims.",
+      "table": "op_claims",
+      "columns": [
+        {
+          "key": "memberReference",
+          "label": "Member Reference",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_memberReference"
+        },
+        {
+          "key": "providerReference",
+          "label": "Provider Reference",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_providerReference"
+        },
+        {
+          "key": "procedureCode",
+          "label": "Procedure Code",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_procedureCode"
+        },
+        {
+          "key": "serviceDate",
+          "label": "Service Date",
+          "type": "date",
+          "required": true,
+          "dbKey": "data_serviceDate"
+        },
+        {
+          "key": "decisionNotes",
+          "label": "Adjudication Decision Notes",
+          "type": "textarea",
+          "required": false,
+          "dbKey": "data_decisionNotes"
+        }
+      ]
+    },
+    {
+      "id": "payment",
+      "title": "Provider Payment & Remittance Register",
+      "description": "Approved payment disbursement, remittance advice generation, and financial reconciliation.",
+      "table": "op_payment",
+      "columns": [
+        {
+          "key": "checkNumber",
+          "label": "Remittance Check Number",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_checkNumber"
+        },
+        {
+          "key": "providerReference",
+          "label": "Provider Reference",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_providerReference"
+        },
+        {
+          "key": "remitDate",
+          "label": "Remittance Date",
+          "type": "date",
+          "required": true,
+          "dbKey": "data_remitDate"
+        },
+        {
+          "key": "serviceLines",
+          "label": "Service Lines Paid",
+          "type": "number",
+          "required": true,
+          "dbKey": "data_serviceLines"
+        },
+        {
+          "key": "remitNotes",
+          "label": "Remittance Notes",
+          "type": "textarea",
+          "required": false,
+          "dbKey": "data_remitNotes"
+        }
+      ]
+    },
+    {
+      "id": "priorauth",
+      "title": "Prior Authorization Register",
+      "description": "Prior authorization requests, clinical review decisions, and authorization validity windows.",
+      "table": "op_priorauth",
+      "columns": [
+        {
+          "key": "authorizationNumber",
+          "label": "Authorization Number",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_authorizationNumber"
+        },
+        {
+          "key": "procedureCode",
+          "label": "Procedure Code",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_procedureCode"
+        },
+        {
+          "key": "requestDate",
+          "label": "Request Date",
+          "type": "date",
+          "required": true,
+          "dbKey": "data_requestDate"
+        },
+        {
+          "key": "units",
+          "label": "Authorized Units",
+          "type": "number",
+          "required": true,
+          "dbKey": "data_units"
+        },
+        {
+          "key": "clinicalNotes",
+          "label": "Clinical Review Notes",
+          "type": "textarea",
+          "required": false,
+          "dbKey": "data_clinicalNotes"
+        }
+      ]
+    },
+    {
+      "id": "tpl",
+      "title": "Third-Party Liability Register",
+      "description": "Coordination of benefits, other-payer identification, and Medicaid payer-of-last-resort enforcement.",
+      "table": "op_tpl",
+      "columns": [
+        {
+          "key": "otherPayer",
+          "label": "Other Responsible Payer",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_otherPayer"
+        },
+        {
+          "key": "policyNumber",
+          "label": "Other Coverage Policy Number",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_policyNumber"
+        },
+        {
+          "key": "cobOrder",
+          "label": "COB Order",
+          "type": "number",
+          "required": true,
+          "dbKey": "data_cobOrder"
+        },
+        {
+          "key": "liabilityDate",
+          "label": "Liability Determination Date",
+          "type": "date",
+          "required": true,
+          "dbKey": "data_liabilityDate"
+        },
+        {
+          "key": "coordinationNotes",
+          "label": "Coordination of Benefits Notes",
+          "type": "textarea",
+          "required": false,
+          "dbKey": "data_coordinationNotes"
+        }
+      ]
+    },
+    {
+      "id": "pharmacy",
+      "title": "Pharmacy Benefit Register",
+      "description": "Pharmacy benefit operations, prescription utilization review, and rebate-eligible utilization.",
+      "table": "op_pharmacy",
+      "columns": [
+        {
+          "key": "ndcCode",
+          "label": "NDC Code",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_ndcCode"
+        },
+        {
+          "key": "drugName",
+          "label": "Drug Name",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_drugName"
+        },
+        {
+          "key": "daysSupply",
+          "label": "Days Supply",
+          "type": "number",
+          "required": true,
+          "dbKey": "data_daysSupply"
+        },
+        {
+          "key": "prescriberNpi",
+          "label": "Prescriber NPI",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_prescriberNpi"
+        },
+        {
+          "key": "pharmacyNotes",
+          "label": "Pharmacy Review Notes",
+          "type": "textarea",
+          "required": false,
+          "dbKey": "data_pharmacyNotes"
+        }
+      ]
+    },
+    {
+      "id": "encounter",
+      "title": "Managed Care Encounter Register",
+      "description": "Managed care encounter submission, validation, and encounter-rate readiness.",
+      "table": "op_encounter",
+      "columns": [
+        {
+          "key": "encounterType",
+          "label": "Encounter Type",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_encounterType"
+        },
+        {
+          "key": "managedCarePlan",
+          "label": "Managed Care Plan",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_managedCarePlan"
+        },
+        {
+          "key": "encounterDate",
+          "label": "Encounter Date",
+          "type": "date",
+          "required": true,
+          "dbKey": "data_encounterDate"
+        },
+        {
+          "key": "validationUnits",
+          "label": "Validation Units",
+          "type": "number",
+          "required": true,
+          "dbKey": "data_validationUnits"
+        },
+        {
+          "key": "validationNotes",
+          "label": "Encounter Validation Notes",
+          "type": "textarea",
+          "required": false,
+          "dbKey": "data_validationNotes"
+        }
+      ]
+    },
+    {
+      "id": "fwa",
+      "title": "Program Integrity FWA Register",
+      "description": "Fraud, waste, and abuse detections, investigation ownership, and recovery actions.",
+      "table": "op_fwa",
+      "columns": [
+        {
+          "key": "caseType",
+          "label": "FWA Case Type",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_caseType"
+        },
+        {
+          "key": "detectionRule",
+          "label": "Detection Rule",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_detectionRule"
+        },
+        {
+          "key": "alertScore",
+          "label": "Alert Score",
+          "type": "number",
+          "required": true,
+          "dbKey": "data_alertScore"
+        },
+        {
+          "key": "lastReview",
+          "label": "Last Review Date",
+          "type": "date",
+          "required": true,
+          "dbKey": "data_lastReview"
+        },
+        {
+          "key": "investigationNotes",
+          "label": "Investigation Notes",
+          "type": "textarea",
+          "required": false,
+          "dbKey": "data_investigationNotes"
+        }
+      ]
+    },
+    {
+      "id": "provider-master",
+      "title": "Provider Registry",
+      "description": "Controlled provider registry records supporting claim adjudication and credentialing evidence.",
+      "table": "op_provider_master",
+      "columns": [
+        {
+          "key": "recordId",
+          "label": "Provider Registry ID",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_recordId"
+        },
+        {
+          "key": "name",
+          "label": "Provider Name",
+          "type": "text",
+          "required": true,
+          "dbKey": "data_name"
+        },
+        {
+          "key": "status",
+          "label": "Status",
+          "type": "select",
+          "required": true,
+          "options": [
+            "Active",
+            "Pending",
+            "Suspended",
+            "Retired"
+          ],
+          "dbKey": "data_status"
+        },
+        {
+          "key": "effectiveDate",
+          "label": "Effective Date",
+          "type": "date",
+          "required": true,
+          "dbKey": "data_effectiveDate"
+        }
+      ]
     }
   ],
   "domainProduct": {
@@ -1390,6 +1962,80 @@
             "auditDetail": "Escalated beneficiary outreach campaign for exception remediation and additional evidence."
           }
         ]
+      },
+      {
+        "id": "claims-command",
+        "title": "Claim Adjudication & Payment",
+        "description": "Coordinate claim adjudication across provider enrollment, coverage rules, payment determination, and remittance evidence.",
+        "view": "control",
+        "modules": [
+          "claims",
+          "payment",
+          "provider-master"
+        ],
+        "actions": [
+          {
+            "id": "approve-claims-command",
+            "label": "Approve Claim Payment",
+            "nextStatus": "Approved",
+            "auditDetail": "Approved claim payment with adjudication evidence and reviewer attribution."
+          },
+          {
+            "id": "escalate-claims-command",
+            "label": "Escalate Claim Review",
+            "nextStatus": "Investigating",
+            "auditDetail": "Escalated claim review for exception remediation and additional evidence."
+          }
+        ]
+      },
+      {
+        "id": "auth-command",
+        "title": "Prior Authorization & TPL",
+        "description": "Coordinate prior authorization clinical review and third-party liability payer-of-last-resort enforcement.",
+        "view": "evidence",
+        "modules": [
+          "priorauth",
+          "tpl"
+        ],
+        "actions": [
+          {
+            "id": "approve-auth-command",
+            "label": "Approve Authorization Determination",
+            "nextStatus": "Approved",
+            "auditDetail": "Approved authorization determination with clinical evidence and reviewer attribution."
+          },
+          {
+            "id": "escalate-auth-command",
+            "label": "Escalate Authorization Review",
+            "nextStatus": "Investigating",
+            "auditDetail": "Escalated authorization review for exception remediation and additional evidence."
+          }
+        ]
+      },
+      {
+        "id": "integrity-command",
+        "title": "Program Integrity & Encounters",
+        "description": "Coordinate fraud waste and abuse detection, encounter validation, and pharmacy utilization review.",
+        "view": "reconciliation",
+        "modules": [
+          "fwa",
+          "encounter",
+          "pharmacy"
+        ],
+        "actions": [
+          {
+            "id": "approve-integrity-command",
+            "label": "Approve Integrity Disposition",
+            "nextStatus": "Approved",
+            "auditDetail": "Approved program integrity disposition with investigation evidence and reviewer attribution."
+          },
+          {
+            "id": "escalate-integrity-command",
+            "label": "Escalate Integrity Investigation",
+            "nextStatus": "Investigating",
+            "auditDetail": "Escalated integrity investigation for exception remediation and additional evidence."
+          }
+        ]
       }
     ]
   },
@@ -1423,10 +2069,28 @@
       "name": "Fair hearing system",
       "category": "Domain data source",
       "mode": "Read-only demo connector"
+    },
+    {
+      "id": "integration-6",
+      "name": "MMIS claims engine",
+      "category": "Core system",
+      "mode": "Bi-directional X12 connector"
+    },
+    {
+      "id": "integration-7",
+      "name": "State pharmacy system",
+      "category": "Domain data source",
+      "mode": "Read-only demo connector"
+    },
+    {
+      "id": "integration-8",
+      "name": "SFTP batch gateway",
+      "category": "File exchange",
+      "mode": "Batch EDI drop (simulated)"
     }
   ],
-  "featureCount": 40,
-  "seededRecords": 300,
+  "featureCount": 64,
+  "seededRecords": 465,
   "demoUsers": 3,
   "apiPort": 5542,
   "dbName": "profit_ai_medicaid_redetermination_operations"

@@ -12,6 +12,9 @@
     "express": "latest",
     "helmet": "latest",
     "jsonwebtoken": "latest",
-    "pg": "latest"
+    "kafkajs": "^2.2.4",
+    "nodemailer": "^10.0.10",
+    "pg": "latest",
+    "ssh2-sftp-client": "^12.1.1"
   }
 }

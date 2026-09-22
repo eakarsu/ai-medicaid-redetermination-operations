@@ -1,0 +1,49 @@
+flowchart LR
+    user["Caseworker / reviewer"]
+    browser["React UI<br/>Vite :4542"]
+    api["Express REST API<br/>:5542"]
+
+    subgraph application["RenewalCare application"]
+        access["JWT authentication<br/>RBAC and audit"]
+        renewal["Eligibility renewal<br/>notices, verification, appeals"]
+        claims["MMIS demo services<br/>claims, payment, TPL, FWA"]
+        exchange["X12 / FHIR services<br/>834 batch and 999 intake"]
+        ai["AI decision briefs"]
+        reports["Reports and MITA mapping<br/>T-MSIS style manifest"]
+        outbox["Event dispatcher"]
+    end
+
+    database[("PostgreSQL<br/>domain data, claims, X12 ledger,<br/>audit and event outbox")]
+    openrouter["OpenRouter API"]
+    sftpClient["SFTP client<br/>key authentication + host key pinning"]
+    sftpServer["Local OpenSSH SFTP server<br/>127.0.0.1:2222"]
+    outbound[("Outbound 834 files")]
+    inbound[("Inbound partner 999 files")]
+    smtp["Configured SMTP server"]
+    kafka["Configured Kafka broker"]
+
+    user --> browser --> api --> access
+    access --> renewal
+    access --> claims
+    access --> exchange
+    access --> ai
+    access --> reports
+    renewal --> database
+    claims --> database
+    exchange --> database
+    ai --> database
+    reports --> database
+    ai --> openrouter
+    renewal -. "notice delivery when configured" .-> smtp
+    database --> outbox
+    outbox -. "publish when configured" .-> kafka
+
+    exchange -->|"upload 834"| sftpClient
+    sftpClient -->|"SSH / SFTP"| sftpServer
+    sftpServer --> outbound
+    inbound --> sftpServer
+    sftpServer -->|"fetch 999"| sftpClient
+    sftpClient -->|"validate and record 999"| exchange
+
+    classDef optional stroke-dasharray: 5 5
+    class smtp,kafka,openrouter optional

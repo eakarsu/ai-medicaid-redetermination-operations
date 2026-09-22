@@ -10,6 +10,7 @@ const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
 const apiPort = Number(process.env.SMOKE_API_PORT || app.apiPort + 1000);
 const mockPort = apiPort + 1000;
 const databaseUrl = process.env.DATABASE_URL || `postgresql://${os.userInfo().username}@127.0.0.1:5432/${app.dbName}`;
+const mfa = await import(path.join(root, 'backend', 'src', 'mfa.mjs'));
 const env = { ...process.env, NODE_ENV: 'test', API_PORT: String(apiPort), UI_PORT: String(app.port), DATABASE_URL: databaseUrl, SESSION_SECRET: 'smoke-test-session-secret-at-least-32-chars', OPENROUTER_API_KEY: 'test-key-not-real', OPENROUTER_MODEL: 'anthropic/claude-haiku-4.5', OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1', OPENROUTER_IGNORE_PROVIDERS: 'ExampleA,ExampleB', OPENROUTER_TEST_URL: `http://127.0.0.1:${mockPort}/chat/completions` };
 
 function assert(value, message) { if (!value) throw new Error(message); }
@@ -52,11 +53,11 @@ try {
   const login = await request('/api/auth/login', null, { method: 'POST', body: JSON.stringify(credentials) });
   const token = login.token;
   const product = await request('/api/app', token); assert(product.ai.configured && product.ai.provider === 'openrouter', 'OpenRouter status is not configured');
-  const dashboard = await request('/api/dashboard', token); assert(dashboard.workflowCount === 8 && dashboard.operationalTableCount === 12 && dashboard.recordCount + dashboard.operationalRowCount === 300, 'dashboard counts wrong');
-  const domain = await request('/api/domain', token); assert(domain.features.length === 5, 'native domain capabilities missing');
+  const dashboard = await request('/api/dashboard', token);   assert(dashboard.workflowCount === 10 && dashboard.operationalTableCount === 21 && dashboard.recordCount + dashboard.operationalRowCount >= 465, 'dashboard counts wrong');
+  const domain = await request('/api/domain', token); assert(domain.features.length === 8, 'native domain capabilities missing');
   for (const feature of domain.features) {
     const capability = await request(`/api/domain/${feature.id}`, token);
-    assert(capability.groups.length >= 2 && capability.groups.every(group => group.items.length === 15), `${feature.id} domain records missing`);
+    assert(capability.groups.length >= 2 && capability.groups.every(group => group.items.length >= 15), `${feature.id} domain records missing`);
     const target = capability.groups[0]; const action = capability.feature.actions[0];
     const result = await request(`/api/domain/${feature.id}/actions/${action.id}`, token, { method: 'POST', body: JSON.stringify({ moduleId: target.module.id, recordId: target.items[0].id }) });
     assert(result.status === action.nextStatus && result.auditDetail === action.auditDetail, `${feature.id} domain action failed`);
@@ -76,14 +77,36 @@ try {
       assert(result.providerNote === 'Demonstration inputs require professional source validation.', 'trailing provider assumption was not extracted');
     }
   }
-  const operations = await request('/api/operations', token); assert(operations.items.length === 12, 'domain tables missing');
-  for (const module of operations.items) { const rows = await request(`/api/operation-records?module=${module.id}`, token); assert(rows.items.length === 15, `${module.id} rows missing`); }
+  const operations = await request('/api/operations', token); assert(operations.items.length === 21, 'domain tables missing');
+  const masked = await request('/api/members/masked', token); const memberRef = masked.items[0].reference;
+  const providerMaster = await request(`/api/operation-records?module=provider-master`, token); const providerRef = providerMaster.items[0].reference;
+  const rules = await request('/api/claims/coverage-rules', token); assert(rules.items.length >= 8 && rules.priorAuthProcedures.length >= 2, 'coverage rules missing');
+  const adjudication = await request('/api/claims/adjudicate', token, { method: 'POST', body: JSON.stringify({ memberReference: memberRef, providerReference: providerRef, procedureCode: '99213', billedAmount: 150, serviceDate: '2026-09-01' }) });
+  assert(adjudication.decision === 'Approved' && adjudication.trace.length >= 7 && adjudication.paid === 120, `adjudication failed: ${JSON.stringify(adjudication).slice(0, 200)}`);
+  assert(adjudication.raw837.includes('ST*837') && adjudication.raw835 && adjudication.raw835.includes('ST*835'), '837/835 generation failed');
+  assert((await request('/api/claims', token)).items.length >= 9, 'claim ledger missing');
+  const fwa = await request('/api/fwa/scan', token, { method: 'POST' });
+  assert(fwa.findings.length >= 4 && fwa.casesOpened >= 4, `FWA scan failed: ${JSON.stringify(fwa).slice(0, 200)}`);
+  const channel = await request('/api/batch/channel', token);
+  if (channel.configured) {
+    const batch = await request('/api/batch/834', token, { method: 'POST', body: JSON.stringify({ limit: 3 }) });
+    assert(batch.manifest.transactionCount === 3 && batch.transfer.bytes === batch.manifest.totalBytes && batch.acknowledgments.length === 0 && batch.status === 'Awaiting partner acknowledgment', '834 SFTP upload failed or acknowledgments were fabricated');
+    const inbound = await request(`/api/batch/${batch.manifest.batchId}/acknowledgments`, token);
+    assert(inbound.received === 0 && inbound.expected === 3, 'unsolicited 999 acknowledgments appeared');
+  }
+  const tmsis = await request('/api/reporting/tmsis', token);
+  assert(tmsis.files.length === 8 && tmsis.totalRecords > 0, 'T-MSIS manifest failed');
+  const portalMember = await request(`/api/portal/member?reference=${encodeURIComponent(memberRef)}`, token);
+  assert(portalMember.member && portalMember.member.name.includes('\u2022') && Array.isArray(portalMember.claims), 'member portal failed');
+  const portalProvider = await request(`/api/portal/provider?reference=${encodeURIComponent(providerRef)}`, token);
+  assert(portalProvider.provider && portalProvider.totals.claims >= 1, 'provider portal failed');
+  for (const module of operations.items) { const rows = await request(`/api/operation-records?module=${module.id}`, token); assert(rows.items.length >= 15, `${module.id} rows missing`); }
   const records = await request('/api/records', token); await request('/api/records/transition', token, { method: 'POST', body: JSON.stringify({ id: records.items[0].id, state: 'review' }) });
   const firstModule = operations.items[0]; const firstRows = await request(`/api/operation-records?module=${firstModule.id}`, token); await request('/api/operation-records/transition', token, { method: 'POST', body: JSON.stringify({ moduleId: firstModule.id, id: firstRows.items[0].id, state: 'Review' }) });
-  assert((await request('/api/reports', token)).modules.length === 12, 'report drill-down data missing');
+  assert((await request('/api/reports', token)).modules.length === 21, 'report drill-down data missing');
   assert((await request('/api/audit-events', token)).items.length >= 24, 'audit data missing');
   const integrations = await request('/api/integrations', token); await request('/api/integrations/test', token, { method: 'POST', body: JSON.stringify({ id: integrations.items[0].id }) });
-  console.log(`Smoke passed ${app.id}: 5 native domain capabilities and actions, React API, PostgreSQL, 3 OpenRouter actions, reports, audit, integrations`);
+  console.log(`Smoke passed ${app.id}: 8 capabilities, MMIS adjudication + FWA + ${channel.configured ? 'real SFTP batch upload' : 'SFTP configuration check'} + T-MSIS + portals, X12 837/835/999, TOTP MFA round-trip, security events, SMTP notice, React API, PostgreSQL, OpenRouter`);
 } finally {
   if (backend) { backend.kill('SIGTERM'); await new Promise(resolve => backend.once('exit', resolve)); }
   await new Promise(resolve => mock.close(resolve));

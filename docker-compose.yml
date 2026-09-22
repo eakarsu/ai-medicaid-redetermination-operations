@@ -1,0 +1,88 @@
+# Cloud reference deployment: managed-style PostgreSQL + real Kafka (KRaft) + real SMTP (Mailpit) + SFTP
+# + the compiled application container. The API applies migrations and serves the built frontend;
+# swap postgres for RDS/Azure Database and Kafka for MSK/Event Hub in production (docs/architecture.md).
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: renewalcare
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-demo-only}
+      POSTGRES_DB: profit_ai_medicaid_redetermination_operations
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U renewalcare"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # Real Apache Kafka broker in KRaft mode (no ZooKeeper). The outbox dispatcher produces
+  # drained events to topic renewalcare.events; consume with any Kafka client.
+  kafka:
+    image: bitnami/kafka:3.7
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_CFG_NODE_ID: "0"
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  # Real SMTP server for notice delivery. SMTP on :1025, web inbox UI on http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  sftp:
+    image: atmoz/sftp:alpine
+    command: renewalcare::1001:1001:outbound,inbound
+    volumes:
+      - ${SFTP_KEY_DIR:-./.local-sftp}/host_key:/etc/ssh/ssh_host_ed25519_key:ro
+      - ${SFTP_KEY_DIR:-./.local-sftp}/client_key.pub:/home/renewalcare/.ssh/keys/client_key.pub:ro
+      - sftpoutbound:/home/renewalcare/outbound
+      - sftpinbound:/home/renewalcare/inbound
+    ports:
+      - "2222:22"
+
+  app:
+    build: .
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: "5542"
+      DATABASE_URL: postgresql://renewalcare:${POSTGRES_PASSWORD:-local-demo-only}@database:5432/profit_ai_medicaid_redetermination_operations
+      SESSION_SECRET: ${SESSION_SECRET:-replace-with-32-random-characters-before-any-real-use!!}
+      PHI_ENCRYPTION_KEY: ${PHI_ENCRYPTION_KEY:-replace-with-32-random-characters-before-any-real-use!!}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-haiku-4.5}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: renewalcare.events
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_FROM: notices@renewalcare.example
+      SFTP_HOST: sftp
+      SFTP_PORT: "22"
+      SFTP_USER: renewalcare
+      SFTP_PRIVATE_KEY_FILE: /run/sftp-keys/client_key
+      SFTP_HOST_KEY_FILE: /run/sftp-keys/host_key.pub
+      SFTP_OUTBOUND_PATH: /outbound
+      SFTP_INBOUND_PATH: /inbound
+    volumes:
+      - ${SFTP_KEY_DIR:-./.local-sftp}/client_key:/run/sftp-keys/client_key:ro
+      - ${SFTP_KEY_DIR:-./.local-sftp}/host_key.pub:/run/sftp-keys/host_key.pub:ro
+    ports:
+      - "5542:5542"
+
+volumes:
+  pgdata:
+  sftpoutbound:
+  sftpinbound:

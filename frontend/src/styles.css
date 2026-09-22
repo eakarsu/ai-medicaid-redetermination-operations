@@ -19,23 +19,25 @@
 
 /* Compact register navigation. */
 .shell{grid-template-columns:246px minmax(0,1fr)}
-.sidebar nav{max-height:calc(100vh - 245px);padding-top:8px}
+.sidebar{display:flex;flex-direction:column;overflow:hidden}
+.sidebar .brand{flex:none}
+.sidebar nav{flex:1;min-height:0;max-height:none;overflow-y:auto;overflow-x:hidden;padding-top:8px;scrollbar-width:thin;scrollbar-color:#52667e transparent}
 .sidebar nav button{padding:7px 10px;margin:1px 0;font-size:12px;line-height:1.25}
 .sidebar .navHeading{color:#6f89a6;font-size:10px;font-weight:850;letter-spacing:.1em;text-transform:uppercase;padding:16px 10px 5px}
 .sidebar .navHeading:first-of-type{padding-top:9px}
+.sidebar .sideFoot{position:static;flex:none;margin-top:9px;padding-top:9px;border-top:1px solid #ffffff18}
 @media(max-width:900px){
   .shell{grid-template-columns:220px minmax(0,1fr)}
   .sidebar{padding:15px 10px}
   .sidebar nav span{display:inline}
   .brand h1,.brand p,.userCard{display:none}
-  .sideFoot{left:10px;right:10px}
 }
 @media(max-width:600px){
   .shell{display:block}
-  .sidebar{position:relative;height:auto;padding:12px 16px}
+  .sidebar{position:relative;height:auto;padding:12px 16px;overflow:visible}
   .brand{padding:2px 0 10px}
   .brand h1{display:block;font-size:16px}
-  .sidebar nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 6px;max-height:220px;overflow:auto}
+  .sidebar nav{display:grid;flex:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 6px;max-height:220px;overflow:auto}
   .sidebar .navHeading{grid-column:1/-1}
   .sideFoot{position:static;margin-top:8px}
   .sideFoot .wide{width:auto;margin:0}

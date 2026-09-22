@@ -16,9 +16,19 @@ services:
       timeout: 3s
       retries: 12
 
+  sftp-init:
+    image: alpine:3.20
+    command: sh -c "chown -R 1001:1001 /outbound /inbound"
+    volumes:
+      - sftpoutbound:/outbound
+      - sftpinbound:/inbound
+
   sftp:
     image: atmoz/sftp:alpine
     restart: unless-stopped
+    depends_on:
+      sftp-init:
+        condition: service_completed_successfully
     command: renewalcare::1001:1001:outbound,inbound
     volumes:
       - ./secrets/sftp/host_key:/etc/ssh/ssh_host_ed25519_key:ro

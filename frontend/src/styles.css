@@ -68,3 +68,9 @@
 .traceRow{grid-template-columns:74px minmax(0,1fr) auto}
 .barRow{grid-template-columns:230px 1fr 150px}
 @media(max-width:600px){.traceRow{grid-template-columns:1fr}.barRow{grid-template-columns:1fr}}
+
+/* Data cards and rows open the same detail dialog as their View action. */
+.clickableCard,.principle[role="button"],.mitaCard[role="button"],.traceRow[role="button"]{cursor:pointer;transition:border-color .16s,box-shadow .16s,background-color .16s}
+.clickableCard:hover,.principle[role="button"]:hover,.mitaCard[role="button"]:hover,.traceRow[role="button"]:hover{border-color:var(--accent);box-shadow:0 8px 24px color-mix(in srgb,var(--accent) 12%,transparent)}
+.clickableCard:focus-visible,.principle[role="button"]:focus-visible,.mitaCard[role="button"]:focus-visible,.traceRow[role="button"]:focus-visible,tr.clickable:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.integration .rowActionButtons{margin-top:15px;flex-wrap:wrap}

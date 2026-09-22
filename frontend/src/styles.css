@@ -59,3 +59,12 @@
 .danger{border:0;border-radius:10px;padding:11px 14px;background:#b91c1c;color:#fff;font-weight:800;cursor:pointer}
 .danger:disabled{opacity:.55;cursor:not-allowed}
 @media(max-width:600px){.recordForm{grid-template-columns:1fr}.modalBackdrop{padding:12px}.modal header{align-items:flex-start;flex-direction:column}.modalHeaderActions{width:100%;justify-content:flex-start}.modalHeaderActions button{flex:1}}
+
+/* Visible actions on register and report rows. */
+.rowActionButtons{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.rowActionButtons button,.tableAction{padding:6px 9px;border-radius:7px;font-size:11px;line-height:1.2}
+.featureCard b,.cardAction{color:var(--accent);font-size:11px;font-weight:850}
+.mitaCard .tableAction,.principle .tableAction{align-self:flex-start;margin-top:auto}
+.traceRow{grid-template-columns:74px minmax(0,1fr) auto}
+.barRow{grid-template-columns:230px 1fr 150px}
+@media(max-width:600px){.traceRow{grid-template-columns:1fr}.barRow{grid-template-columns:1fr}}

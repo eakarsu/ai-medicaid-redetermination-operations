@@ -491,6 +491,14 @@ export function createApp() {
     res.json({ modules, totalAmount: modules.reduce((sum, item) => sum + item.amount, 0), totalAttention: modules.reduce((sum, item) => sum + item.attention, 0) });
   });
   api.get('/audit-events', async (_req, res) => res.json({ items: (await pool.query('SELECT * FROM audit_events ORDER BY event_time DESC,id DESC LIMIT 100')).rows }));
+  api.post('/audit-events/note', requirePermission('audit:note'), async (req, res) => {
+    const objectType = String(req.body?.objectType || '').trim();
+    const reference = String(req.body?.reference || '').trim();
+    const detail = String(req.body?.detail || '').trim();
+    if (!objectType || !reference || !detail || objectType.length > 200 || reference.length > 200 || detail.length > 4000) return res.status(422).json({ error: 'Object type, reference, and note are required within their length limits' });
+    const result = await pool.query('INSERT INTO audit_events(actor,action,object_type,object_reference,detail) VALUES($1,$2,$3,$4,$5) RETURNING *', [req.user.email, 'Manual note', objectType, reference, detail]);
+    res.status(201).json({ item: result.rows[0], message: 'Audit note added' });
+  });
   api.get('/integrations', async (_req, res) => res.json({ items: (await pool.query('SELECT * FROM integration_state ORDER BY name')).rows }));
   api.post('/ai/analyze', requirePermission('ai:analyze'), async (req, res, next) => {
     try {

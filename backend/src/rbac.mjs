@@ -13,6 +13,7 @@ export const PERMISSIONS = {
   'operations:create': ['admin', 'operator'],
   'operations:edit': ['admin', 'operator'],
   'operations:delete': ['admin'],
+  'audit:note': ['admin', 'operator'],
   'integrations:test': ['admin'],
   'ai:analyze': ['admin', 'operator', 'reviewer'],
   'ai:save': ['admin', 'operator'],

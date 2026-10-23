@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import { mountTasks } from './tasks.mjs';
+import { filterRecords, exportRecords, buildInsights, labelledSections } from './featurePack.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -311,19 +313,7 @@ export function createApp() {
     try { await pool.query('SELECT 1'); res.json({ status: 'ok', app: config.id, title: config.title, tagline: config.tagline, accent: config.accent, database: 'postgresql', ai: aiStatus(), kafka: kafkaStatus(), smtp: smtpStatus(), security: { rbac: 'enforced', phiEncryption: 'AES-256-GCM available', rateLimiting: 'active', mfa: 'TOTP available', sessionSecretConfigured: securityStatus.configured } }); }
     catch { res.status(503).json({ status: 'error', error: 'PostgreSQL is unavailable' }); }
   });
-  api.get('/auth/demo-credentials', (_req, res) => {
-    const password = process.env.DEMO_PASSWORD || 'LocalDemo!2026';
-    const adminEmail = process.env.DEMO_EMAIL || 'runtime-admin@example.com';
-    res.json({
-      email: adminEmail,
-      password,
-      accounts: [
-        { role: 'admin', name: 'Runtime Administrator', email: adminEmail },
-        { role: 'operator', name: 'Operations Lead', email: 'operations-lead@example.com' },
-        { role: 'reviewer', name: 'Independent Reviewer', email: 'reviewer@example.com' },
-      ],
-    });
-  });
+  api.get('/auth/demo-credentials', (_req, res) => res.status(404).json({ error: 'Credential discovery is disabled' }));
   api.post('/auth/login', rateLimit({ bucket: 'login', windowMs: 5 * 60_000, max: 20 }), async (req, res) => {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const lockKey = `${req.ip || 'unknown'}:${email}`;
@@ -356,6 +346,12 @@ export function createApp() {
   api.use(auth);
   const recordPolicy = { canEdit: user => can(user.role, 'operations:edit'), canDelete: user => can(user.role, 'operations:delete') };
   mountOperationalRecordActions(api, { pool, config, identifier, audit, basePath: '', permissionPolicy: recordPolicy });
+  const tasksRouterAdapter = {
+    get: (p, ...h) => api.get(p.replace(/^\/api/, ""), ...h),
+    post: (p, ...h) => api.post(p.replace(/^\/api/, ""), ...h),
+    patch: (p, ...h) => api.patch(p.replace(/^\/api/, ""), ...h),
+  };
+  mountTasks(tasksRouterAdapter, { pool, audit });
   api.get('/app', (req, res) => res.json({ ...config, user: req.user, ai: aiStatus(), rbac: permissionMatrix() , recordPermissions: recordPermissions(req.user, recordPolicy) }));
   api.get('/dashboard', async (_req, res) => {
     const [records, attention, recent, analyses] = await Promise.all([
@@ -419,7 +415,17 @@ export function createApp() {
   api.get('/workflows', (_req, res) => res.json({ items: config.workflows }));
   api.get('/records', async (req, res) => {
     const result = req.query.workflow ? await pool.query('SELECT * FROM workflow_cases WHERE workflow_id=$1 ORDER BY due_date', [req.query.workflow]) : await pool.query('SELECT * FROM workflow_cases ORDER BY due_date');
-    res.json({ items: result.rows });
+    const items = filterRecords(result.rows, { search: req.query.search || req.query.q, status: req.query.status, risk: req.query.risk, owner: req.query.owner });
+    res.json({ items, total: items.length });
+  });
+  api.get('/export/records', async (req, res) => {
+    const result = await pool.query('SELECT * FROM workflow_cases ORDER BY due_date');
+    const out = exportRecords(filterRecords(result.rows, { search: req.query.search || req.query.q, status: req.query.status, risk: req.query.risk, owner: req.query.owner }), req.query.format);
+    res.setHeader('Content-Type', out.contentType); res.setHeader('Content-Disposition', `attachment; filename="${out.filename}"`); res.send(out.body);
+  });
+  api.post('/ai/insights', async (req, res) => {
+    const result = await pool.query('SELECT * FROM workflow_cases ORDER BY due_date');
+    res.json({ aiGenerated: false, insights: buildInsights(result.rows), sections: result.rows.slice(0, 5).map(labelledSections) });
   });
   api.get('/operations', (_req, res) => res.json({ items: config.operations }));
   api.get('/operation-records', async (req, res) => {
